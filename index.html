@@ -89,18 +89,10 @@
   <h3>⚙ 설정</h3>
   <label>Groq API 키 (무료: console.groq.com → API Keys)</label>
   <input id="sKey" type="password" placeholder="gsk_...">
-  <label>뇌 모델</label>
-  <select id="sModel">
-    <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (똑똑함, 기본)</option>
-    <option value="openai/gpt-oss-120b">gpt-oss-120b (더 똑똑, 조금 느림)</option>
-    <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (제일 빠름)</option>
-    <option value="qwen/qwen3-32b">qwen3-32b (코딩)</option>
-  </select>
+  <label>뇌 모델 <button class="sub" id="sRefresh" style="padding:2px 8px;margin:0;font-size:11px">목록 새로고침</button></label>
+  <select id="sModel"><option value="auto">자동 (추천)</option></select>
   <label>사진 보는 모델 (📷)</label>
-  <select id="sVision">
-    <option value="meta-llama/llama-4-scout-17b-16e-instruct">llama-4-scout (기본)</option>
-    <option value="meta-llama/llama-4-maverick-17b-128e-instruct">llama-4-maverick (더 정확)</option>
-  </select>
+  <select id="sVision"><option value="auto">자동</option></select>
   <label>내 이름</label><input id="sUser" placeholder="유준">
   <label>호출어 (항상 듣기 모드에서 이 말로 시작할 때만 반응. 비우면 전부 반응)</label><input id="sWake" placeholder="공">
   <label>목소리</label><select id="sVoice"></select>
@@ -129,12 +121,12 @@ const LS = {
   set: (k, v) => localStorage.setItem('gong.' + k, JSON.stringify(v)),
 };
 const cfg = {
-  key: LS.get('key', ''), model: LS.get('model', 'llama-3.3-70b-versatile'),
-  vision: LS.get('vision', 'meta-llama/llama-4-scout-17b-16e-instruct'),
+  key: LS.get('key', ''), model: LS.get('model', 'auto'), models: LS.get('models', []),
+  vision: LS.get('vision', 'auto'),
   user: LS.get('user', ''), wake: LS.get('wake', '공'), voiceName: LS.get('voiceName', ''),
   rate: LS.get('rate', 1.15), persona: LS.get('persona', ''),
   voiceOn: LS.get('voiceOn', false), always: false,
-  home: LS.get('home', ''), srv: LS.get('srv', ''), srvTok: LS.get('srvTok', ''),
+  modelsAt: LS.get('modelsAt', 0), home: LS.get('home', ''), srv: LS.get('srv', ''), srvTok: LS.get('srvTok', ''),
   quick: LS.get('quick', '타이머=5분 타이머\n날씨=오늘 날씨 어때\n기억=뭐 기억해\n서버=서버 상태 확인해줘'),
 };
 let lastPos = null;
@@ -155,7 +147,8 @@ const SITES = {유튜브:'https://m.youtube.com', 깃허브:'https://github.com'
 const log = $('#log'), ring = $('#ring'), hint = $('#hint'), status = $('#status');
 function add(cls, text) { const d = document.createElement('div'); d.className = 'm ' + cls; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; return d; }
 function setRing(mode, h = '') { ring.className = mode; hint.textContent = h; }
-function setStatus() { status.textContent = (cfg.key ? cfg.model.split('/').pop() : '키 없음') + (cfg.voiceOn ? ' · 🔈' : ' · 🔇') + (cfg.always ? ' · 👂' : ''); $('#btnVoice').className = 'ib ' + (cfg.voiceOn ? 'on' : 'off'); $('#btnAlways').className = 'ib ' + (cfg.always ? 'on' : 'off'); }
+let shownModel = '';
+function setStatus() { if (cfg.key) brainModel().then(m => { shownModel = m; status.textContent = (m || '?').split('/').pop() + (cfg.voiceOn ? ' · 🔈' : ' · 🔇') + (cfg.always ? ' · 👂' : ''); }).catch(() => {}); status.textContent = (cfg.key ? (shownModel || cfg.model).split('/').pop() : '키 없음') + (cfg.voiceOn ? ' · 🔈' : ' · 🔇') + (cfg.always ? ' · 👂' : ''); $('#btnVoice').className = 'ib ' + (cfg.voiceOn ? 'on' : 'off'); $('#btnAlways').className = 'ib ' + (cfg.always ? 'on' : 'off'); }
 
 /* ---------------- 입 (TTS) ---------------- */
 const synth = window.speechSynthesis;
@@ -312,8 +305,11 @@ const tools = {
   },
   web_answer: async ({ question }) => {
     // Groq 내장 웹검색 모델(compound)에게 물어봄 → 결과 텍스트
-    const m = await groq([{ role: 'system', content: '웹 검색으로 사실을 확인하고 한국어로 3문장 이내로 답해. 출처 사이트 이름을 끝에 괄호로.' }, { role: 'user', content: question }], { model: 'groq/compound-mini', useTools: false });
-    return m.content || '검색 결과 없음';
+    const sys = { role: 'system', content: '웹 검색으로 사실을 확인하고 한국어로 3문장 이내로 답해. 출처 사이트 이름을 끝에 괄호로.' };
+    for (const m of ['groq/compound-mini', 'groq/compound']) {
+      try { const r = await groq([sys, { role: 'user', content: question }], { model: m, useTools: false, _retry: false }); return r.content || '검색 결과 없음'; } catch (e) {}
+    }
+    return '지금 Groq에 웹검색 모델이 없어요. 구글 검색창을 열어드릴게요: ' + tools.web_search({ query: question });
   },
 
   /* ---- 그림 ---- */
@@ -372,6 +368,33 @@ const TOOL_SCHEMAS = [
   properties: Object.fromEntries(Object.entries(props).map(([k, t]) => [k, { type: t.replace('?', '') }])),
   required: Object.entries(props).filter(([, t]) => !t.endsWith('?')).map(([k]) => k) } } }));
 
+/* ---------------- 모델 자동 선택 ---------------- */
+const SKIP = /whisper|tts|guard|compound|orpheus|embed|moderation|safeguard/i;
+const BRAIN_PREF = [/gpt-oss-120b/i, /kimi-k2/i, /llama-3\.3-70b/i, /qwen3/i, /llama-4-maverick/i, /llama-4-scout/i, /gpt-oss-20b/i, /70b/i, /32b/i, /./];
+const VISION_PREF = [/maverick/i, /scout/i, /vision|vl\b|llava/i, /vl/i];
+const FAST_PREF = [/gpt-oss-20b/i, /8b/i, /instant/i];
+async function fetchModels(force = false) {
+  if (cfg.models.length && !force && cfg.modelsAt && Date.now() - cfg.modelsAt < 86400000) return cfg.models;
+  const r = await fetch('https://api.groq.com/openai/v1/models', { headers: { Authorization: 'Bearer ' + cfg.key } });
+  if (!r.ok) throw new Error('모델 목록 조회 실패 ' + r.status);
+  const ids = (await r.json()).data.map(m => m.id).filter(id => !SKIP.test(id));
+  cfg.models = ids; cfg.modelsAt = Date.now(); LS.set('models', ids); LS.set('modelsAt', cfg.modelsAt);
+  return ids;
+}
+function pickBy(prefs, ids) { for (const p of prefs) { const hit = ids.find(id => p.test(id)); if (hit) return hit; } return null; }
+async function resolveModel(kind = 'brain', force = false) {
+  const ids = await fetchModels(force);
+  if (kind === 'vision') return pickBy(VISION_PREF, ids);           // 없으면 null
+  return pickBy(BRAIN_PREF, ids) || ids[0];
+}
+async function brainModel() { if (cfg.model !== 'auto' && cfg.models.includes(cfg.model)) return cfg.model; if (cfg.model !== 'auto' && !cfg.models.length) return cfg.model; return await resolveModel('brain'); }
+async function visionModel() { if (cfg.vision !== 'auto') return cfg.vision; return await resolveModel('vision'); }
+function fillModelSelects() {
+  const mk = (sel, ids, cur) => { sel.innerHTML = '<option value="auto">자동 (추천)</option>' + ids.map(id => `<option value="${id}">${id}</option>`).join(''); sel.value = ids.includes(cur) || cur === 'auto' ? cur : 'auto'; };
+  mk($('#sModel'), cfg.models, cfg.model); mk($('#sVision'), cfg.models.filter(id => VISION_PREF.some(p => p.test(id))), cfg.vision);
+}
+$('#sRefresh').onclick = async e => { e.preventDefault(); if (!$('#sKey').value.trim()) return; cfg.key = $('#sKey').value.trim(); try { await fetchModels(true); fillModelSelects(); add('s', `모델 ${cfg.models.length}개: ${cfg.models.slice(0, 6).join(', ')}…`); } catch (err) { add('s', err.message); } };
+
 /* ---------------- 뇌 (Groq) ---------------- */
 function systemPrompt() {
   const mem = memory.slice(-60).map(m => '- ' + m.t).join('\n');
@@ -387,14 +410,25 @@ function systemPrompt() {
 ${cfg.persona ? '- ' + cfg.persona : ''}
 ${mem ? '\n[기억하는 것]\n' + mem : ''}`;
 }
-async function groq(messages, { model = cfg.model, useTools = true } = {}) {
+async function groq(messages, { model = null, useTools = true, _retry = true } = {}) {
+  if (!model) model = await brainModel();
   abortCtl = new AbortController();
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST', signal: abortCtl.signal,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.key },
     body: JSON.stringify({ model, messages, temperature: 0.4, max_tokens: 700, ...(useTools ? { tools: TOOL_SCHEMAS, tool_choice: 'auto' } : {}) }),
   });
-  if (!r.ok) { const e = await r.text(); throw new Error(r.status + ' ' + e.slice(0, 200)); }
+  if (!r.ok) {
+    const e = await r.text();
+    if (r.status === 404 && /model/i.test(e) && _retry) {          // 모델 사라짐 → 목록 새로 받고 자동 재선택
+      add('s', `모델 ${model} 없어짐 → 자동 재선택`);
+      cfg.model = 'auto'; LS.set('model', 'auto');
+      const m2 = await resolveModel('brain', true);
+      setStatus();
+      return groq(messages, { model: m2, useTools, _retry: false });
+    }
+    throw new Error(r.status + ' ' + e.slice(0, 200));
+  }
   return (await r.json()).choices[0].message;
 }
 async function ask(userText, image) {
@@ -403,8 +437,10 @@ async function ask(userText, image) {
   // 이미지가 있으면 비전 모델로 먼저 설명 → 텍스트로 붙임
   let msgs = [{ role: 'system', content: systemPrompt() }, ...history];
   if (image) {
-    const v = await groq([{ role: 'user', content: [{ type: 'image_url', image_url: { url: image } }, { type: 'text', text: '이 사진/화면에 보이는 걸 한국어로 자세히 설명하고, 텍스트는 그대로 읽어줘. 에러나 문제가 보이면 짚어줘.' }] }], { model: cfg.vision, useTools: false });
-    msgs[msgs.length - 1] = { role: 'user', content: `[사진 내용]\n${v.content}\n\n[사용자 요청]\n${userText}` };
+    const vm = await visionModel();
+    if (!vm) { msgs[msgs.length - 1] = { role: 'user', content: `(사진을 첨부했지만 지금 Groq에 사진 보는 모델이 없어서 못 봤다고 사용자에게 알려줘) ${userText}` }; }
+    else { const v = await groq([{ role: 'user', content: [{ type: 'image_url', image_url: { url: image } }, { type: 'text', text: '이 사진/화면에 보이는 걸 한국어로 자세히 설명하고, 텍스트는 그대로 읽어줘. 에러나 문제가 보이면 짚어줘.' }] }], { model: vm, useTools: false });
+    msgs[msgs.length - 1] = { role: 'user', content: `[사진 내용]\n${v.content}\n\n[사용자 요청]\n${userText}` }; }
   }
   for (let i = 0; i < 6; i++) {
     const m = await groq(msgs);
@@ -495,10 +531,11 @@ $('#imp').onchange = async e => {
 $('#sTutorial').onclick = () => NATIVE ? (location.href = 'tutorial.html') : window.open('tutorial.html', '_blank');
 
 /* ---------------- 설정 ---------------- */
-function openSettings() { $('#sKey').value = cfg.key; $('#sModel').value = cfg.model; $('#sVision').value = cfg.vision; $('#sUser').value = cfg.user; $('#sWake').value = cfg.wake; $('#sRate').value = cfg.rate; $('#sPersona').value = cfg.persona; $('#sHome').value = cfg.home; $('#sSrv').value = cfg.srv; $('#sSrvTok').value = cfg.srvTok; $('#sQuick').value = cfg.quick; loadVoices(); $('#settings').classList.add('open'); }
+function openSettings() { $('#sKey').value = cfg.key; fillModelSelects(); if (cfg.key && !cfg.models.length) fetchModels().then(fillModelSelects).catch(() => {}); $('#sUser').value = cfg.user; $('#sWake').value = cfg.wake; $('#sRate').value = cfg.rate; $('#sPersona').value = cfg.persona; $('#sHome').value = cfg.home; $('#sSrv').value = cfg.srv; $('#sSrvTok').value = cfg.srvTok; $('#sQuick').value = cfg.quick; loadVoices(); $('#settings').classList.add('open'); }
 $('#btnSet').onclick = openSettings;
 $('#sSave').onclick = () => {
-  cfg.key = $('#sKey').value.trim(); cfg.model = $('#sModel').value; cfg.vision = $('#sVision').value; cfg.user = $('#sUser').value.trim(); cfg.wake = $('#sWake').value.trim();
+  const newKey = $('#sKey').value.trim(); if (newKey !== cfg.key) { cfg.models = []; LS.set('models', []); }
+  cfg.key = newKey; cfg.model = $('#sModel').value; cfg.vision = $('#sVision').value; cfg.user = $('#sUser').value.trim(); cfg.wake = $('#sWake').value.trim();
   cfg.voiceName = $('#sVoice').value; cfg.rate = +$('#sRate').value; cfg.persona = $('#sPersona').value.trim();
   cfg.home = $('#sHome').value.trim(); cfg.srv = $('#sSrv').value.trim(); cfg.srvTok = $('#sSrvTok').value.trim(); cfg.quick = $('#sQuick').value;
   for (const k of ['key', 'model', 'vision', 'user', 'wake', 'voiceName', 'rate', 'persona', 'home', 'srv', 'srvTok', 'quick']) LS.set(k, cfg[k]);
