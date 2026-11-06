@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060a12">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>공</title>
+<style>
+  :root{--bg:#060a12;--panel:#0d1420;--line:#16314a;--cyan:#38e8ff;--cyan2:#0a8fb0;--txt:#d9f3ff;--dim:#6f93a8;--warn:#ffb347;--bad:#ff5c7a}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:-apple-system,"Noto Sans KR","Malgun Gothic",sans-serif;overflow:hidden}
+  #app{display:flex;flex-direction:column;height:100%;padding-top:env(safe-area-inset-top)}
+  header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line)}
+  header b{letter-spacing:4px;color:var(--cyan);font-size:18px}
+  header .st{font-size:11px;color:var(--dim)}
+  header button{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:6px 10px;font-size:12px}
+  #log{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth}
+  .m{max-width:88%;padding:9px 12px;border-radius:12px;font-size:15px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+  .u{align-self:flex-end;background:#15324a;border-bottom-right-radius:3px}
+  .g{align-self:flex-start;background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:3px}
+  .s{align-self:center;color:var(--dim);font-size:12px;background:none}
+  .t{align-self:flex-start;color:var(--cyan2);font-size:12px;font-family:monospace}
+  /* 자비스 링 */
+  #ring{position:relative;width:150px;height:150px;margin:6px auto 2px;display:grid;place-items:center}
+  #ring .c{position:absolute;border-radius:50%;border:2px solid var(--cyan);opacity:.35}
+  #ring .c1{inset:0}#ring .c2{inset:14px;border-style:dashed;opacity:.25}#ring .c3{inset:28px;opacity:.15}
+  #ring .core{width:76px;height:76px;border-radius:50%;background:radial-gradient(circle,#0e3a4d,#071a24 70%);border:2px solid var(--cyan);display:grid;place-items:center;font-size:30px;color:var(--cyan);user-select:none}
+  #ring.listen .c1{animation:spin 3s linear infinite;opacity:.8}
+  #ring.listen .c2{animation:spin 2s linear infinite reverse;opacity:.6}
+  #ring.listen .core{box-shadow:0 0 30px var(--cyan)}
+  #ring.think .c3{animation:pulse 1s ease-in-out infinite}
+  #ring.speak .core{animation:pulse .5s ease-in-out infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.08);opacity:1}}
+  #hint{text-align:center;color:var(--dim);font-size:12px;min-height:16px}
+  #bar{display:flex;gap:8px;padding:8px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);align-items:center}
+  #bar input{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:22px;padding:11px 14px;font-size:15px;outline:none}
+  .ib{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--cyan);font-size:18px;display:grid;place-items:center}
+  .ib.on{background:var(--cyan2);color:#fff;border-color:var(--cyan)}
+  .ib.off{color:var(--dim)}
+  #talk{width:64px;height:64px;font-size:26px;border:2px solid var(--cyan)}
+  #talk.active{background:var(--cyan);color:#000;box-shadow:0 0 24px var(--cyan)}
+  /* 설정 */
+  #settings{position:fixed;inset:0;background:rgba(3,6,10,.96);display:none;flex-direction:column;padding:18px;overflow-y:auto;z-index:9}
+  #settings.open{display:flex}
+  #settings h3{color:var(--cyan);margin:6px 0 10px}
+  #settings label{display:block;color:var(--dim);font-size:12px;margin:12px 0 4px}
+  #settings input,#settings select,#settings textarea{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:10px;font-size:14px}
+  #settings .row{display:flex;gap:8px;align-items:center}
+  #settings .row label{margin:0;flex:1}
+  #settings button{background:var(--cyan2);border:none;color:#fff;border-radius:8px;padding:12px;font-size:15px;margin-top:16px}
+  #settings .sub{background:none;border:1px solid var(--line);color:var(--dim);font-size:13px;padding:8px;margin-top:8px}
+  #settings small{color:var(--dim);display:block;margin-top:4px;line-height:1.4}
+  #cam,#imp{display:none}
+  #quick{display:flex;gap:6px;padding:0 12px 6px;overflow-x:auto}
+  #quick button{flex:1;min-width:70px;background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:8px 4px;font-size:12px;white-space:nowrap}
+  .m svg{width:100%;height:auto;background:#0a1220;border-radius:8px}
+  .m.pic{max-width:96%;width:96%}
+  .m img{max-width:100%;border-radius:8px;display:block}
+  .srv{align-self:flex-start;background:#0a1a12;border:1px solid #1d4a2e;font-family:monospace;font-size:12px;max-width:95%}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div><b>공</b> <span class="st" id="status">준비 중</span></div>
+    <div><button id="btnMem">기억</button> <button id="btnSet">⚙</button></div>
+  </header>
+  <div id="log"></div>
+  <div id="ring"><div class="c c1"></div><div class="c c2"></div><div class="c c3"></div><div class="core">공</div></div>
+  <div id="hint"></div>
+  <div id="quick"></div>
+  <div id="bar">
+    <button class="ib" id="btnCam" title="사진 보고 해결">📷</button>
+    <button class="ib" id="btnVoice" title="목소리">🔈</button>
+    <button class="ib" id="talk" title="누른 채 말하기">🎤</button>
+    <button class="ib" id="btnAlways" title="항상 듣기">👂</button>
+    <input id="txt" placeholder="타이핑 또는 🎤 누른 채 말하기" autocomplete="off">
+  </div>
+</div>
+<input type="file" id="cam" accept="image/*" capture="environment">
+<input type="file" id="imp" accept="application/json">
+
+<div id="settings">
+  <h3>⚙ 설정</h3>
+  <label>Groq API 키 (무료: console.groq.com → API Keys)</label>
+  <input id="sKey" type="password" placeholder="gsk_...">
+  <label>뇌 모델</label>
+  <select id="sModel">
+    <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (똑똑함, 기본)</option>
+    <option value="openai/gpt-oss-120b">gpt-oss-120b (더 똑똑, 조금 느림)</option>
+    <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (제일 빠름)</option>
+    <option value="qwen/qwen3-32b">qwen3-32b (코딩)</option>
+  </select>
+  <label>사진 보는 모델 (📷)</label>
+  <select id="sVision">
+    <option value="meta-llama/llama-4-scout-17b-16e-instruct">llama-4-scout (기본)</option>
+    <option value="meta-llama/llama-4-maverick-17b-128e-instruct">llama-4-maverick (더 정확)</option>
+  </select>
+  <label>내 이름</label><input id="sUser" placeholder="유준">
+  <label>호출어 (항상 듣기 모드에서 이 말로 시작할 때만 반응. 비우면 전부 반응)</label><input id="sWake" placeholder="공">
+  <label>목소리</label><select id="sVoice"></select>
+  <div class="row"><label>말 속도</label><input id="sRate" type="range" min="0.8" max="1.6" step="0.1" style="width:55%"></div>
+  <label>집 주소 (길찾기용, 예: 서울 강남구 ...)</label><input id="sHome" placeholder="집 주소">
+  <label>리눅스 서버 URL (gong_server.py + cloudflared 주소)</label><input id="sSrv" placeholder="https://xxxx.trycloudflare.com">
+  <label>리눅스 서버 토큰</label><input id="sSrvTok" type="password" placeholder="gong_token.txt 내용">
+  <label>빠른 버튼 4개 (이름=말할 내용, 줄바꿈 구분)</label><textarea id="sQuick" rows="4"></textarea>
+  <label>성격 (시스템 프롬프트 추가)</label><textarea id="sPersona" rows="3" placeholder="예: 반말로 짧게. 가끔 농담."></textarea>
+  <button id="sSave">저장</button>
+  <button class="sub" id="sTestVoice">목소리 테스트</button>
+  <button class="sub" id="sClear">대화 기록 지우기</button>
+  <button class="sub" id="sExport">⬇ 백업 내보내기 (기억·메모·설정)</button>
+  <button class="sub" id="sImport">⬆ 백업 가져오기</button>
+  <button class="sub" id="sTutorial">📖 튜토리얼 열기</button>
+  <small>• 마이크/목소리는 기본 꺼짐. 🎤 누른 채 말하기 / 👂 항상 듣기 / 🔈 목소리.<br>• 모든 데이터는 이 폰 안(localStorage)에만 저장. API 키도 서버로 안 감(Groq로만 직접 전송).<br>• 안드로이드 음성 인식은 삼성 인터넷보다 <b>Chrome</b>에서 가장 잘 됨.</small>
+</div>
+
+<script>
+/* =========================================================
+   공 모바일 — Groq 뇌 + 폰 내장 귀/입 + 기억 + 도구
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const LS = {
+  get: (k, d) => { try { const v = localStorage.getItem('gong.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set: (k, v) => localStorage.setItem('gong.' + k, JSON.stringify(v)),
+};
+const cfg = {
+  key: LS.get('key', ''), model: LS.get('model', 'llama-3.3-70b-versatile'),
+  vision: LS.get('vision', 'meta-llama/llama-4-scout-17b-16e-instruct'),
+  user: LS.get('user', ''), wake: LS.get('wake', '공'), voiceName: LS.get('voiceName', ''),
+  rate: LS.get('rate', 1.15), persona: LS.get('persona', ''),
+  voiceOn: LS.get('voiceOn', false), always: false,
+  home: LS.get('home', ''), srv: LS.get('srv', ''), srvTok: LS.get('srvTok', ''),
+  quick: LS.get('quick', '타이머=5분 타이머\n날씨=오늘 날씨 어때\n기억=뭐 기억해\n서버=서버 상태 확인해줘'),
+};
+let lastPos = null;
+const NATIVE = !!window.Android;          // 안드로이드 앱 안에서 실행 중이면 true
+const openExt = url => { if (NATIVE) Android.openUrl(url); else window.open(url, '_blank'); };
+let history = LS.get('history', []);
+let memory = LS.get('memory', []);      // [{d:'2026-11-06', t:'...'}]
+let notes = LS.get('notes', []);
+let busy = false, abortCtl = null;
+
+const SITES = {유튜브:'https://m.youtube.com', 깃허브:'https://github.com', 구글:'https://www.google.com', 네이버:'https://m.naver.com',
+  디스코드:'https://discord.com/app', 로블록스:'https://www.roblox.com', 콜랩:'https://colab.research.google.com', 지메일:'https://mail.google.com',
+  클로드:'https://claude.ai', 챗지피티:'https://chat.openai.com', 허깅페이스:'https://huggingface.co', 나무위키:'https://namu.wiki',
+  위키백과:'https://ko.m.wikipedia.org', 번역기:'https://papago.naver.com', 날씨:'https://weather.naver.com', 치지직:'https://chzzk.naver.com',
+  트위치:'https://m.twitch.tv', 넷플릭스:'https://www.netflix.com', 지도:'https://map.naver.com', 유튜브뮤직:'https://music.youtube.com'};
+
+/* ---------------- UI ---------------- */
+const log = $('#log'), ring = $('#ring'), hint = $('#hint'), status = $('#status');
+function add(cls, text) { const d = document.createElement('div'); d.className = 'm ' + cls; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; return d; }
+function setRing(mode, h = '') { ring.className = mode; hint.textContent = h; }
+function setStatus() { status.textContent = (cfg.key ? cfg.model.split('/').pop() : '키 없음') + (cfg.voiceOn ? ' · 🔈' : ' · 🔇') + (cfg.always ? ' · 👂' : ''); $('#btnVoice').className = 'ib ' + (cfg.voiceOn ? 'on' : 'off'); $('#btnAlways').className = 'ib ' + (cfg.always ? 'on' : 'off'); }
+
+/* ---------------- 입 (TTS) ---------------- */
+const synth = window.speechSynthesis;
+let voices = [];
+function loadVoices() {
+  voices = synth.getVoices().filter(v => v.lang.replace('_', '-').toLowerCase().startsWith('ko'));
+  const sel = $('#sVoice'); sel.innerHTML = '';
+  if (!voices.length) { sel.innerHTML = '<option value="">(한국어 음성 없음 → 설정 > 일반 > TTS 에서 한국어 설치)</option>'; return; }
+  voices.forEach(v => { const o = document.createElement('option'); o.value = v.name; o.textContent = v.name + (v.localService ? ' (오프라인)' : ''); sel.appendChild(o); });
+  if (!cfg.voiceName || !voices.find(v => v.name === cfg.voiceName)) cfg.voiceName = (voices.find(v => /ko-KR-language|Google/.test(v.name)) || voices[0]).name;
+  sel.value = cfg.voiceName;
+}
+synth.onvoiceschanged = loadVoices; loadVoices();
+function clean(t) { return t.replace(/```[\s\S]*?```/g, ' 코드는 화면에 있어요. ').replace(/`[^`]*`/g, '').replace(/https?:\/\/\S+/g, '링크').replace(/[*_#>|~]/g, '').trim(); }
+function speak(text) {
+  if (!cfg.voiceOn || !text) return;
+  if (NATIVE) { setRing('speak', '말하는 중… (탭하면 끊기)'); Android.speak(clean(text).split(/(?<=[.!?。])\s+|\n+/).filter(Boolean).slice(0, 6).join(' ')); return; }
+  synth.cancel();
+  const parts = clean(text).split(/(?<=[.!?。])\s+|\n+/).filter(Boolean).slice(0, 6);
+  setRing('speak', '말하는 중… (탭하면 끊기)');
+  parts.forEach((p, i) => {
+    const u = new SpeechSynthesisUtterance(p); u.lang = 'ko-KR'; u.rate = cfg.rate;
+    const v = voices.find(v => v.name === cfg.voiceName); if (v) u.voice = v;
+    if (i === parts.length - 1) u.onend = () => { if (ring.className === 'speak') setRing('', ''); if (cfg.always) startAlways(); };
+    synth.speak(u);
+  });
+}
+function shutUp() { if (NATIVE) Android.stopSpeak(); synth.cancel(); if (ring.className === 'speak') setRing('', ''); }
+
+/* ---------------- 귀 (STT) ---------------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recMode = null;   // 'ptt' | 'always'
+function makeRec(continuous) {
+  if (!SR) { add('s', '이 브라우저는 음성 인식이 안 돼요. Chrome으로 열어주세요.'); return null; }
+  const r = new SR(); r.lang = 'ko-KR'; r.continuous = continuous; r.interimResults = true; r.maxAlternatives = 3;
+  let final = '';
+  r.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const res = e.results[i];
+      if (res.isFinal) final += pickAlt(res); else interim += res[0].transcript;
+    }
+    hint.textContent = (final + interim).trim() || '듣는 중…';
+    if (continuous && final.trim()) { const t = final.trim(); final = ''; onHeard(t, true); }
+  };
+  r.onerror = e => { if (e.error !== 'no-speech' && e.error !== 'aborted') add('s', '음성 오류: ' + e.error); };
+  r.onend = () => {
+    if (recMode === 'ptt' && final.trim()) { const t = final.trim(); final = ''; onHeard(t, false); }
+    else if (recMode === 'ptt') setRing('', '');
+    if (recMode === 'always' && cfg.always && !busy && ring.className !== 'speak') { try { r.start(); } catch {} }   // 자동 재시작
+    if (recMode === 'ptt') recMode = null;
+  };
+  return r;
+}
+function pickAlt(res) {
+  // 후보 중 호출어/사이트/명령 키워드가 들어간 걸 우선
+  const keys = [cfg.wake, cfg.user, ...Object.keys(SITES), '열어', '켜', '꺼', '기억', '타이머', '메모'].filter(Boolean);
+  for (let i = 0; i < res.length; i++) if (keys.some(k => res[i].transcript.includes(k))) return res[i].transcript;
+  return res[0].transcript;
+}
+function startPTT() { if (busy) return; shutUp(); if (NATIVE) { setRing('listen', '듣는 중… 말 끝나면 자동 실행'); Android.listenOnce(); return; } stopAlways(); rec = makeRec(false); if (!rec) return; recMode = 'ptt'; setRing('listen', '듣는 중… 떼면 실행'); try { rec.start(); } catch {} }
+function stopPTT() { if (NATIVE) return; if (recMode === 'ptt' && rec) { setTimeout(() => { try { rec.stop(); } catch {} }, 250); } }
+let alwaysRec = null;
+function startAlways() { if (NATIVE) { Android.setListening(true); setRing('listen', `"${cfg.wake}"으로 시작하는 말에 반응 · 화면 꺼져도 OK`); return; } if (!cfg.always || busy) return; if (!alwaysRec) { alwaysRec = makeRec(true); if (!alwaysRec) { cfg.always = false; setStatus(); return; } } recMode = 'always'; setRing('listen', cfg.wake ? `"${cfg.wake}"으로 시작하는 말에 반응` : '듣는 중'); try { alwaysRec.start(); } catch {} }
+function stopAlways() { if (NATIVE) { Android.setListening(false); setRing('', ''); return; } if (alwaysRec) { try { alwaysRec.abort(); } catch {} } if (recMode === 'always') { recMode = null; setRing('', ''); } }
+
+/* ---------------- 명령어 (뇌 안 거침) ---------------- */
+const norm = s => s.toLowerCase().replace(/[^\w\s가-힣]/g, ' ').replace(/\s+/g, ' ').replace(/(해\s?주세요|해\s?줘|해\s?봐|주세요|줘|해|요)$/, '').trim();
+function quick(text) {
+  let t = norm(text);
+  if (cfg.wake) t = t.replace(new RegExp('^' + cfg.wake + '\\s*[,아야]?\\s*'), '');
+  const has = (...k) => k.some(x => t.includes(x));
+  if (has('소리 켜', '목소리 켜', '말해도')) { cfg.voiceOn = true; LS.set('voiceOn', true); setStatus(); return '목소리 켰어요.'; }
+  if (has('소리 꺼', '목소리 꺼', '조용히', '쉿', '그만 말')) { cfg.voiceOn = false; LS.set('voiceOn', false); shutUp(); setStatus(); return '목소리 껐어요.'; }
+  if (has('항상 들', '마이크 켜')) { cfg.always = true; setStatus(); startAlways(); return '항상 듣기 켰어요.'; }
+  if (has('그만 들', '마이크 꺼')) { cfg.always = false; setStatus(); stopAlways(); return '항상 듣기 껐어요.'; }
+  if (has('기억 초기화', '대화 지워')) { history = []; LS.set('history', []); return '대화 기록 지웠어요.'; }
+  if (/^(뭐 기억|기억 보여|나에 대해 뭐)/.test(t)) return tools.recall({});
+  const m = t.match(/^(?:이거 )?기억(?:해)?\s+(.+)/); if (m) return tools.remember({ fact: m[1] });
+  for (const [name, url] of Object.entries(SITES)) if (t.startsWith(name) && has('열', '켜', '들어가', '가')) return tools.open_url({ url });
+  const mu = t.match(/^(?:노래|음악)\s*(?:틀어|재생)\s*(.+)?$|^(.+?)\s*(?:노래|음악)\s*(?:틀어|재생)/);
+  if (mu) return tools.play_music({ query: (mu[1] || mu[2] || '').trim() });
+  const ys = t.match(/^유튜브(?:에서)?\s+(.+?)\s*(?:검색|찾아|틀어)/); if (ys) return tools.open_url({ url: 'https://m.youtube.com/results?search_query=' + encodeURIComponent(ys[1]) });
+  const gs = t.match(/^(?:구글|검색)(?:에서)?\s+(.+?)\s*(?:검색|찾아)?$/); if (gs && has('검색', '찾아')) return tools.web_search({ query: gs[1] });
+  const tm = t.match(/(\d+)\s*분\s*(?:뒤|후)?\s*(?:타이머|알려|깨워)/); if (tm) return tools.set_timer({ minutes: +tm[1] });
+  if (/^(지금 )?몇\s?시/.test(t)) return tools.now({});
+  return null;
+}
+
+/* ---------------- 도구 (뇌가 호출) ---------------- */
+const tools = {
+  open_url: ({ url }) => { if (!/^https?:/.test(url)) url = SITES[url] || 'https://' + url; openExt(url); return '열었어요: ' + url; },
+  web_search: ({ query }) => { openExt('https://www.google.com/search?q=' + encodeURIComponent(query)); return '구글 검색: ' + query; },
+  youtube_search: ({ query }) => { openExt('https://m.youtube.com/results?search_query=' + encodeURIComponent(query)); return '유튜브 검색: ' + query; },
+  now: () => { const d = new Date(); return d.toLocaleString('ko-KR', { weekday: 'long', hour: 'numeric', minute: 'numeric', month: 'long', day: 'numeric' }); },
+  set_timer: ({ minutes, label = '타이머' }) => { setTimeout(() => { add('s', `⏰ ${label} 끝!`); if (NATIVE) Android.notify(`⏰ ${label} ${minutes}분 끝`); if (navigator.vibrate) navigator.vibrate([300, 100, 300]); const on = cfg.voiceOn; cfg.voiceOn = true; speak(`${label} ${minutes}분 끝났어요.`); cfg.voiceOn = on; }, minutes * 60000); return `${minutes}분 타이머 시작`; },
+  remember: ({ fact }) => { fact = fact.trim(); if (!fact) return '뭘 기억할지?'; if (memory.some(m => m.t === fact)) return '이미 기억해요.'; memory.push({ d: new Date().toISOString().slice(0, 10), t: fact }); memory = memory.slice(-300); LS.set('memory', memory); return '기억했어요: ' + fact; },
+  recall: ({ keyword = '' }) => { const ls = memory.filter(m => !keyword || m.t.includes(keyword)); return ls.length ? ls.slice(-20).map(m => '- ' + m.t).join('\n') : '기억이 없어요.'; },
+  forget: ({ keyword }) => { const n = memory.length; memory = memory.filter(m => !m.t.includes(keyword)); LS.set('memory', memory); return `${n - memory.length}개 잊었어요.`; },
+  add_note: ({ text }) => { notes.push({ d: new Date().toLocaleString('ko-KR'), t: text }); LS.set('notes', notes); return '메모 추가'; },
+  read_notes: () => notes.length ? notes.slice(-10).map(n => `[${n.d}] ${n.t}`).join('\n') : '메모 없음',
+  calculate: ({ expression }) => { try { if (!/^[\d\s+\-*/().%^]+$/.test(expression)) return '숫자식만'; return String(Function('"use strict";return (' + expression.replace(/\^/g, '**') + ')')()); } catch (e) { return '계산 오류'; } },
+  copy_text: async ({ text }) => { try { await navigator.clipboard.writeText(text); return '복사했어요'; } catch { return '복사 실패'; } },
+  share: async ({ text }) => { try { await navigator.share({ text }); return '공유창 열림'; } catch { return '공유 취소'; } },
+  call_phone: ({ number }) => { openExt('tel:' + number); return '전화 앱 열림'; },
+  send_sms: ({ number, text = '' }) => { openExt(`sms:${number}?body=${encodeURIComponent(text)}`); return '문자 앱 열림'; },
+  vibrate: ({ ms = 200 }) => { navigator.vibrate && navigator.vibrate(ms); return '진동'; },
+
+  /* ---- 음악 ---- */
+  play_music: ({ query = '', mode = 'song' }) => {
+    if (!query) { openExt('https://music.youtube.com'); return '유튜브뮤직 열었어요'; }
+    // mode: song(첫 곡 재생 시도) | playlist(재생목록만) | mix(믹스)
+    const q = encodeURIComponent(query + (mode === 'mix' ? ' mix' : ''));
+    const url = mode === 'playlist' ? `https://m.youtube.com/results?search_query=${q}&sp=EgIQAw%3D%3D`
+              : `https://music.youtube.com/search?q=${q}`;
+    openExt(url); return `${query} ${mode === 'playlist' ? '재생목록' : ''} 열었어요. 첫 항목 누르면 재생돼요.`;
+  },
+
+  /* ---- 위치 ---- */
+  get_location: async () => {
+    const p = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000 }));
+    lastPos = { lat: p.coords.latitude, lng: p.coords.longitude };
+    return `현재 위치: ${lastPos.lat.toFixed(5)}, ${lastPos.lng.toFixed(5)}`;
+  },
+  route_to: async ({ destination, mode = 'transit' }) => {
+    if (!lastPos) await tools.get_location();
+    if (/^집$|집으로|집까지/.test(destination) && cfg.home) destination = cfg.home;
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${lastPos.lat},${lastPos.lng}&destination=${encodeURIComponent(destination)}&travelmode=${mode}`;
+    openExt(url); return `${destination}까지 길찾기 열었어요 (${mode})`;
+  },
+  nearby: async ({ what }) => {
+    if (!lastPos) await tools.get_location();
+    openExt(`https://www.google.com/maps/search/${encodeURIComponent(what)}/@${lastPos.lat},${lastPos.lng},16z`);
+    return `근처 ${what} 지도 열었어요`;
+  },
+
+  /* ---- 웹 정보 (공이 직접 읽고 말함) ---- */
+  weather: async ({ place = '' }) => {
+    let lat, lng, name = place;
+    if (place) {
+      const g = await (await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(place)}&count=1&language=ko`)).json();
+      if (!g.results) return `'${place}' 위치를 못 찾았어요`;
+      lat = g.results[0].latitude; lng = g.results[0].longitude; name = g.results[0].name;
+    } else { if (!lastPos) await tools.get_location(); lat = lastPos.lat; lng = lastPos.lng; name = '현재 위치'; }
+    const w = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=2`)).json();
+    const C = { 0: '맑음', 1: '대체로 맑음', 2: '구름 조금', 3: '흐림', 45: '안개', 48: '안개', 51: '이슬비', 53: '이슬비', 55: '이슬비', 61: '비', 63: '비', 65: '강한 비', 71: '눈', 73: '눈', 75: '폭설', 80: '소나기', 81: '소나기', 82: '강한 소나기', 95: '뇌우', 96: '뇌우', 99: '뇌우' };
+    const c = w.current, d = w.daily;
+    return `${name} 지금 ${c.temperature_2m}°C (체감 ${c.apparent_temperature}°C), ${C[c.weather_code] || '날씨코드 ' + c.weather_code}, 바람 ${c.wind_speed_10m}km/h. 오늘 ${d.temperature_2m_min[0]}~${d.temperature_2m_max[0]}°C, 강수확률 ${d.precipitation_probability_max[0]}%. 내일 ${d.temperature_2m_min[1]}~${d.temperature_2m_max[1]}°C, 강수확률 ${d.precipitation_probability_max[1]}%.`;
+  },
+  exchange_rate: async ({ from = 'USD', to = 'KRW', amount = 1 }) => {
+    const r = await (await fetch(`https://open.er-api.com/v6/latest/${from.toUpperCase()}`)).json();
+    const v = r.rates?.[to.toUpperCase()]; if (!v) return '환율을 못 가져왔어요';
+    return `${amount} ${from.toUpperCase()} = ${(v * amount).toLocaleString('ko-KR', { maximumFractionDigits: 2 })} ${to.toUpperCase()} (${r.time_last_update_utc?.slice(5, 16)} 기준)`;
+  },
+  web_answer: async ({ question }) => {
+    // Groq 내장 웹검색 모델(compound)에게 물어봄 → 결과 텍스트
+    const m = await groq([{ role: 'system', content: '웹 검색으로 사실을 확인하고 한국어로 3문장 이내로 답해. 출처 사이트 이름을 끝에 괄호로.' }, { role: 'user', content: question }], { model: 'groq/compound-mini', useTools: false });
+    return m.content || '검색 결과 없음';
+  },
+
+  /* ---- 그림 ---- */
+  draw_svg: ({ svg, caption = '' }) => {
+    const d = document.createElement('div'); d.className = 'm g pic';
+    d.innerHTML = svg.replace(/<script[\s\S]*?<\/script>/gi, '') + (caption ? `<div style="color:var(--dim);font-size:12px;margin-top:4px">${caption.replace(/</g, '&lt;')}</div>` : '');
+    log.appendChild(d); log.scrollTop = log.scrollHeight; return '그림을 화면에 그렸어요' + (caption ? ': ' + caption : '');
+  },
+  draw_image: ({ prompt }) => {
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=512&nologo=true&seed=${Date.now() % 100000}`;
+    const d = document.createElement('div'); d.className = 'm g pic'; const im = new Image(); im.src = url; im.alt = prompt; d.appendChild(im); log.appendChild(d); log.scrollTop = log.scrollHeight;
+    return '이미지 생성 중 (몇 초 뒤 화면에 나타남): ' + prompt;
+  },
+
+  /* ---- 리눅스 서버 ---- */
+  srv: async (action, body = {}, danger = false) => {
+    if (!cfg.srv) return '리눅스 서버가 설정에 없어요 (⚙ → 리눅스 서버 URL/토큰)';
+    if (danger && !confirm(`서버에서 실행할까요?\n${action} ${JSON.stringify(body).slice(0, 120)}`)) return '사용자가 취소함';
+    const r = await fetch(cfg.srv.replace(/\/$/, '') + '/api', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Gong-Token': cfg.srvTok }, body: JSON.stringify({ action, ...body }) });
+    const j = await r.json();
+    const out = j.out ?? j.content ?? (j.items ? j.items.join('\n') : JSON.stringify(j));
+    const d = add('srv', `$ ${action} ${body.cmd || body.path || ''}\n${String(out).slice(0, 1500)}`);
+    return (j.ok ? '' : '[실패] ') + String(out).slice(0, 4000);
+  },
+  server_run: ({ command, cwd = '.' }) => tools.srv('run', { cmd: command, cwd }, /\b(rm|mv|dd|mkfs|shutdown|reboot|kill|chmod|chown|>)\b|\brm\s/.test(command)),
+  server_ls: ({ path = '.' }) => tools.srv('ls', { path }),
+  server_read: ({ path }) => tools.srv('read', { path }),
+  server_write: ({ path, content }) => tools.srv('write', { path, content }, true),
+  server_replace: ({ path, old, new: nw, all = false }) => tools.srv('replace', { path, old, new: nw, all }, true),
+  server_delete: ({ path }) => tools.srv('delete', { path }, true),
+  server_status: async () => { try { const r = await fetch(cfg.srv.replace(/\/$/, '') + '/api', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Gong-Token': cfg.srvTok }, body: '{"action":"ping"}' }); const j = await r.json(); return j.ok ? `서버 연결됨: ${j.host} (ROOT ${j.root})` : '토큰 불일치'; } catch (e) { return '서버 연결 실패: ' + e.message; } },
+};
+const TOOL_SCHEMAS = [
+  // 타입 뒤 ? = 선택 인자
+  ['open_url', '사이트/앱 열기. url은 전체 주소 또는 별명(유튜브, 네이버, 깃허브...)', { url: 'string' }],
+  ['web_search', '구글 검색창 열기', { query: 'string' }], ['youtube_search', '유튜브 검색', { query: 'string' }],
+  ['now', '현재 날짜/시간', {}], ['set_timer', '타이머(분)', { minutes: 'number', label: 'string?' }],
+  ['remember', '사용자에 대한 사실을 장기 기억에 저장', { fact: 'string' }], ['recall', '장기 기억 검색(keyword 비우면 전부)', { keyword: 'string?' }],
+  ['forget', '기억 삭제', { keyword: 'string' }], ['add_note', '메모 추가', { text: 'string' }], ['read_notes', '메모 읽기', {}],
+  ['calculate', '계산', { expression: 'string' }], ['copy_text', '클립보드 복사', { text: 'string' }], ['share', '공유창', { text: 'string' }],
+  ['call_phone', '전화 걸기', { number: 'string' }], ['send_sms', '문자 앱 열기', { number: 'string', text: 'string?' }], ['vibrate', '진동', { ms: 'number?' }],
+  ['play_music', '음악 재생(유튜브뮤직). mode: song|playlist|mix', { query: 'string', mode: 'string?' }],
+  ['get_location', '현재 GPS 위치', {}], ['route_to', '길찾기 열기. destination에 "집" 가능. mode: transit|driving|walking', { destination: 'string', mode: 'string?' }],
+  ['nearby', '근처 장소 지도 (예: 편의점, 카페)', { what: 'string' }],
+  ['weather', '날씨. place 비우면 현재 위치', { place: 'string?' }], ['exchange_rate', '환율', { from: 'string?', to: 'string?', amount: 'number?' }],
+  ['web_answer', '웹 검색해서 사실 확인 (뉴스, 가격, 최신 정보, 모르는 것)', { question: 'string' }],
+  ['draw_svg', '설명용 그림/도식을 SVG로 그려서 화면에 표시. svg는 <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">로 시작하는 완전한 코드. 어두운 배경이니 밝은 색 선/글자', { svg: 'string', caption: 'string?' }],
+  ['draw_image', '사진 같은 이미지 생성 (영어 프롬프트)', { prompt: 'string' }],
+  ['server_status', '리눅스 서버 연결 확인', {}], ['server_run', '리눅스 서버에서 셸 명령 실행', { command: 'string', cwd: 'string?' }],
+  ['server_ls', '서버 폴더 목록', { path: 'string?' }], ['server_read', '서버 파일 읽기', { path: 'string' }],
+  ['server_write', '서버 파일 쓰기(덮어쓰기)', { path: 'string', content: 'string' }],
+  ['server_replace', '서버 파일 일부 교체 (old→new). 작은 수정은 write 대신 이걸로', { path: 'string', old: 'string', new: 'string', all: 'boolean?' }],
+  ['server_delete', '서버 파일/폴더 삭제', { path: 'string' }],
+].map(([name, description, props]) => ({ type: 'function', function: { name, description, parameters: {
+  type: 'object',
+  properties: Object.fromEntries(Object.entries(props).map(([k, t]) => [k, { type: t.replace('?', '') }])),
+  required: Object.entries(props).filter(([, t]) => !t.endsWith('?')).map(([k]) => k) } } }));
+
+/* ---------------- 뇌 (Groq) ---------------- */
+function systemPrompt() {
+  const mem = memory.slice(-60).map(m => '- ' + m.t).join('\n');
+  return `너는 '공'. ${cfg.user || '사용자'}의 폰 안에서 일하는 개인 AI 비서.
+- 한국어로 짧고 시원하게. 아이언맨의 자비스처럼 침착하고 약간 재치있게. 답은 기본 1~3문장.
+- 음성으로 읽힐 수 있으니 마크다운 기호를 본문에 쓰지 않는다. 코드는 코드블록으로.
+- 사용자의 말은 음성 인식을 거쳐 오므로 오타/비슷한 발음 오류가 섞일 수 있다. 문맥으로 의도를 추측해 처리하고 정말 모를 때만 되묻는다.
+- 할 수 있는 건 도구로 직접 한다. 사용자가 자기 정보(취향, 일정, 이름)를 말하면 remember로 저장.
+- 최신 정보/사실 확인은 web_answer, 날씨는 weather, 환율은 exchange_rate. 추측으로 답하지 말 것.
+- 구조·흐름·비교·위치 관계 등 그림이 이해를 돕는 설명이면 draw_svg로 도식을 그리고 말로 보충. 글자는 한국어, 밝은 색.
+- 리눅스 서버 작업: server_ls/read로 먼저 확인 → server_replace로 수정 → server_run으로 실행/테스트 → 결과 보고. 삭제나 위험 명령은 사용자에게 먼저 물어본다.
+- 지금 시각: ${new Date().toLocaleString('ko-KR')}
+${cfg.persona ? '- ' + cfg.persona : ''}
+${mem ? '\n[기억하는 것]\n' + mem : ''}`;
+}
+async function groq(messages, { model = cfg.model, useTools = true } = {}) {
+  abortCtl = new AbortController();
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST', signal: abortCtl.signal,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + cfg.key },
+    body: JSON.stringify({ model, messages, temperature: 0.4, max_tokens: 700, ...(useTools ? { tools: TOOL_SCHEMAS, tool_choice: 'auto' } : {}) }),
+  });
+  if (!r.ok) { const e = await r.text(); throw new Error(r.status + ' ' + e.slice(0, 200)); }
+  return (await r.json()).choices[0].message;
+}
+async function ask(userText, image) {
+  if (!cfg.key) { openSettings(); return 'Groq API 키를 먼저 넣어주세요 (무료).'; }
+  history.push({ role: 'user', content: userText }); history = history.slice(-30);
+  // 이미지가 있으면 비전 모델로 먼저 설명 → 텍스트로 붙임
+  let msgs = [{ role: 'system', content: systemPrompt() }, ...history];
+  if (image) {
+    const v = await groq([{ role: 'user', content: [{ type: 'image_url', image_url: { url: image } }, { type: 'text', text: '이 사진/화면에 보이는 걸 한국어로 자세히 설명하고, 텍스트는 그대로 읽어줘. 에러나 문제가 보이면 짚어줘.' }] }], { model: cfg.vision, useTools: false });
+    msgs[msgs.length - 1] = { role: 'user', content: `[사진 내용]\n${v.content}\n\n[사용자 요청]\n${userText}` };
+  }
+  for (let i = 0; i < 6; i++) {
+    const m = await groq(msgs);
+    if (!m.tool_calls || !m.tool_calls.length) { const out = (m.content || '').trim(); history.push({ role: 'assistant', content: out }); LS.set('history', history); return out; }
+    msgs.push(m);
+    for (const c of m.tool_calls) {
+      let args = {}; try { args = JSON.parse(c.function.arguments || '{}'); } catch {}
+      add('t', `🔧 ${c.function.name}(${Object.values(args).join(', ').slice(0, 60)})`);
+      const fn = tools[c.function.name]; let out = fn ? await fn(args) : '없는 도구';
+      msgs.push({ role: 'tool', tool_call_id: c.id, content: String(out) });
+    }
+  }
+  return '도구를 너무 많이 호출해서 멈췄어요.';
+}
+
+/* ---------------- 처리 루프 ---------------- */
+let pending = null;
+async function onHeard(text, fromAlways) {
+  text = text.trim(); if (!text) return;
+  if (fromAlways && cfg.wake && !text.startsWith(cfg.wake)) return;   // 호출어 없는 말은 무시
+  if (busy) { pending = text; shutUp(); if (abortCtl) abortCtl.abort(); return; }   // 최신 말만
+  busy = true; shutUp(); if (!NATIVE) stopAlways();
+  add('u', text); setRing('think', '생각 중…');
+  try {
+    let reply = quick(text);
+    if (reply === null) reply = await ask(text, pendingImage); pendingImage = null;
+    if (reply) { add('g', reply); speak(reply); }
+  } catch (e) {
+    if (e.name !== 'AbortError') add('s', '오류: ' + e.message + (/401|invalid_api_key/i.test(e.message) ? ' → 설정에서 API 키 확인' : ''));
+  } finally {
+    busy = false; if (ring.className === 'think') setRing('', '');
+    if (pending) { const p = pending; pending = null; onHeard(p, false); } else if (!NATIVE && cfg.always && !synth.speaking) startAlways();
+  }
+}
+
+/* ---------------- 네이티브(안드로이드 앱) 콜백 ---------------- */
+window.onAndroidHeard = (text, fromAlways) => { onHeard(text, false); };          // 호출어는 네이티브에서 이미 확인
+window.onAndroidPartial = t => { hint.textContent = t; };
+window.onAndroidState = st => { if (st === 'listen' && !busy) setRing('listen', cfg.always ? `👂 항상 듣기 (호출어 "${cfg.wake}")` : '듣는 중…'); else if (st === 'speak') setRing('speak', '말하는 중… (탭하면 끊기)'); else if (st === 'idle' && !busy) setRing('', cfg.always ? '👂 대기' : ''); };
+window.onAndroidListening = on => { cfg.always = on; setStatus(); };
+if (NATIVE) { try { cfg.always = Android.isListening(); Android.setWake(cfg.wake); } catch {} }
+
+/* ---------------- 📷 사진 보고 해결 ---------------- */
+let pendingImage = null;
+$('#btnCam').onclick = () => $('#cam').click();
+$('#cam').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const b = await new Promise(res => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); const s = Math.min(1, 1280 / Math.max(img.width, img.height)); c.width = img.width * s; c.height = img.height * s; c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', 0.8)); }; img.src = URL.createObjectURL(f); });
+  pendingImage = b; add('s', '📷 사진 첨부됨. 뭘 할지 말하거나 타이핑 (예: 이 에러 고쳐줘)'); $('#txt').focus();
+  e.target.value = '';
+};
+
+/* ---------------- 이벤트 ---------------- */
+const talk = $('#talk');
+const down = e => { e.preventDefault(); talk.classList.add('active'); startPTT(); };
+const up = e => { e.preventDefault(); talk.classList.remove('active'); stopPTT(); };
+talk.addEventListener('touchstart', down, { passive: false }); talk.addEventListener('touchend', up); talk.addEventListener('touchcancel', up);
+talk.addEventListener('mousedown', down); talk.addEventListener('mouseup', up); talk.addEventListener('mouseleave', e => { if (talk.classList.contains('active')) up(e); });
+$('#btnVoice').onclick = () => { cfg.voiceOn = !cfg.voiceOn; LS.set('voiceOn', cfg.voiceOn); if (!cfg.voiceOn) shutUp(); setStatus(); add('s', cfg.voiceOn ? '🔈 목소리 켬' : '🔇 목소리 끔'); };
+$('#btnAlways').onclick = () => { cfg.always = !cfg.always; setStatus(); cfg.always ? startAlways() : stopAlways(); add('s', cfg.always ? '👂 항상 듣기 (호출어: ' + (cfg.wake || '없음') + ')' : '👂 항상 듣기 끔'); };
+ring.onclick = () => { if (synth.speaking) { shutUp(); if (abortCtl) abortCtl.abort(); } };
+$('#txt').addEventListener('keydown', e => { if (e.key === 'Enter') { const v = e.target.value; e.target.value = ''; onHeard(v, false); } });
+$('#btnMem').onclick = () => add('g', '🧠 기억\n' + tools.recall({}) + '\n\n📝 메모\n' + tools.read_notes());
+
+/* ---------------- 빠른 버튼 ---------------- */
+function renderQuick() {
+  const q = $('#quick'); q.innerHTML = '';
+  cfg.quick.split('\n').map(l => l.split('=')).filter(a => a[0] && a[1]).slice(0, 6).forEach(([name, say]) => {
+    const b = document.createElement('button'); b.textContent = name.trim(); b.onclick = () => onHeard(say.trim(), false); q.appendChild(b);
+  });
+}
+/* ---------------- 백업 ---------------- */
+$('#sExport').onclick = () => {
+  const data = { v: 1, when: new Date().toISOString(), memory, notes, history, cfg: { ...cfg, key: '', srvTok: '' } };
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' })); a.download = `gong-backup-${data.when.slice(0, 10)}.json`; a.click();
+};
+$('#sImport').onclick = () => $('#imp').click();
+$('#imp').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (d.memory) { memory = d.memory; LS.set('memory', memory); } if (d.notes) { notes = d.notes; LS.set('notes', notes); } if (d.history) { history = d.history; LS.set('history', history); }
+    if (d.cfg) for (const k of ['model', 'vision', 'user', 'wake', 'voiceName', 'rate', 'persona', 'home', 'srv', 'quick']) if (d.cfg[k] !== undefined) { cfg[k] = d.cfg[k]; LS.set(k, cfg[k]); }
+    renderQuick(); setStatus(); $('#settings').classList.remove('open'); add('s', `백업 가져옴 (기억 ${memory.length}, 메모 ${notes.length})`);
+  } catch (err) { add('s', '가져오기 실패: ' + err.message); }
+  e.target.value = '';
+};
+$('#sTutorial').onclick = () => NATIVE ? (location.href = 'tutorial.html') : window.open('tutorial.html', '_blank');
+
+/* ---------------- 설정 ---------------- */
+function openSettings() { $('#sKey').value = cfg.key; $('#sModel').value = cfg.model; $('#sVision').value = cfg.vision; $('#sUser').value = cfg.user; $('#sWake').value = cfg.wake; $('#sRate').value = cfg.rate; $('#sPersona').value = cfg.persona; $('#sHome').value = cfg.home; $('#sSrv').value = cfg.srv; $('#sSrvTok').value = cfg.srvTok; $('#sQuick').value = cfg.quick; loadVoices(); $('#settings').classList.add('open'); }
+$('#btnSet').onclick = openSettings;
+$('#sSave').onclick = () => {
+  cfg.key = $('#sKey').value.trim(); cfg.model = $('#sModel').value; cfg.vision = $('#sVision').value; cfg.user = $('#sUser').value.trim(); cfg.wake = $('#sWake').value.trim();
+  cfg.voiceName = $('#sVoice').value; cfg.rate = +$('#sRate').value; cfg.persona = $('#sPersona').value.trim();
+  cfg.home = $('#sHome').value.trim(); cfg.srv = $('#sSrv').value.trim(); cfg.srvTok = $('#sSrvTok').value.trim(); cfg.quick = $('#sQuick').value;
+  for (const k of ['key', 'model', 'vision', 'user', 'wake', 'voiceName', 'rate', 'persona', 'home', 'srv', 'srvTok', 'quick']) LS.set(k, cfg[k]);
+  if (NATIVE) Android.setWake(cfg.wake);
+  renderQuick(); $('#settings').classList.remove('open'); setStatus(); add('s', '설정 저장됨');
+};
+$('#sTestVoice').onclick = () => { cfg.voiceName = $('#sVoice').value; cfg.rate = +$('#sRate').value; const on = cfg.voiceOn; cfg.voiceOn = true; speak('안녕하세요, 공입니다. 이 목소리 어때요?'); cfg.voiceOn = on; };
+$('#sClear').onclick = () => { history = []; LS.set('history', []); log.innerHTML = ''; $('#settings').classList.remove('open'); add('s', '대화 기록 지움'); };
+
+/* ---------------- 시작 ---------------- */
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+setStatus(); renderQuick();
+add('s', cfg.key ? (NATIVE ? `공 온라인 (앱). 👂 항상 듣기는 화면 꺼져도 작동 · 알림창에서도 제어` : `공 온라인. 🎤 누른 채 말하기 · 👂 항상 듣기 · 🔈 목소리 · 📷 사진`) : '⚙ 설정에서 Groq API 키(무료)를 넣어주세요.');
+history.slice(-6).forEach(m => add(m.role === 'user' ? 'u' : 'g', m.content));
+</script>
+</body>
+</html>
